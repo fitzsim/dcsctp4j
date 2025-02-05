@@ -12,7 +12,7 @@ set -e
 export -n SHELLOPTS
 
 JAVA_HOME=$1
-DEPOT_TOOLS_DIR=$2
+DEPOT_TOOLS_DIR=$2 # Ignored
 WEBRTC_DIR=$3
 ARCH=$4
 
@@ -21,11 +21,19 @@ case $ARCH in
         JNAARCH=x86-64
         DEBARCH=x86_64
         GN_ARCH=x64
+        GCC_ARCH=x86_64
         ;;
     "arm64"|"aarch64")
         JNAARCH=aarch64
         DEBARCH=arm64
         GN_ARCH=arm64
+        GCC_ARCH=aarch64
+        ;;
+    "ppc64le")
+        JNAARCH=ppc64le
+        DEBARCH=ppc64el
+        GN_ARCH=ppc64le
+        GCC_ARCH=powerpc64le
         ;;
     *)
 	echo "ERROR: Unsupported arch $ARCH"
@@ -33,37 +41,33 @@ case $ARCH in
 	;;
 esac
 
-NATIVEDEBARCH=$(dpkg --print-architecture)
-
-if [ $DEBARCH != $NATIVEDEBARCH -a -f "cmake/$DEBARCH-linux-gnu.cmake" ]; then
-    TOOLCHAIN_FILE="cmake/$DEBARCH-linux-gnu.cmake"
-fi
+# apt install g++-{aarch64,powerpc64le,x86-64}-linux-gnu
+TOOLCHAIN_FILE="cmake/$DEBARCH-linux-gnu.cmake"
 
 if test \! -d $WEBRTC_DIR/.git -a -r $WEBRTC_DIR/.gclient -a -d $WEBRTC_DIR/src/.git; then
-    # They specified the WebRTC gclient directory, not the src checkout subdirectory
     WEBRTC_DIR=$WEBRTC_DIR/src
 fi
 
 WEBRTC_BUILD=out/linux-$GN_ARCH
-WEBRTC_OBJ=$WEBRTC_DIR/$WEBRTC_BUILD
+WEBRTC_OBJ=$WEBRTC_DIR/../$WEBRTC_BUILD
 
 PATH=$PATH:$DEPOT_TOOLS_DIR
 
 startdir=$PWD
-
-cd $WEBRTC_DIR
-./build/linux/sysroot_scripts/install-sysroot.py --arch=$GN_ARCH
-rm -rf $WEBRTC_BUILD
-gn gen $WEBRTC_BUILD --args="use_custom_libcxx=false target_cpu=\"$GN_ARCH\" is_debug=false symbol_level=2"
-ninja -C $WEBRTC_BUILD dcsctp
-
-cd $startdir
 
 NCPU=$(nproc)
 if [ -n "$NCPU" -a "$NCPU" -gt 1 ]
 then
     MAKE_ARGS="-j $NCPU"
 fi
+
+cd $startdir/resources
+# Build libdcsctp.a.
+# FIXME: Is replacement logic for "gn gen" required?
+XCXX=${GCC_ARCH}-linux-gnu-g++
+XAR=${GCC_ARCH}-linux-gnu-ar
+make $MAKE_ARGS VPATH="$WEBRTC_DIR" OBJDIR="$WEBRTC_OBJ/obj" CXX=$XCXX AR=$XAR
+cd $startdir
 
 if [ -n "$MAKE_ARGS" ]
 then
