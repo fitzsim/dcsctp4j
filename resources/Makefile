@@ -32,10 +32,10 @@ CXXFLAGS += -fstack-protector -funwind-tables -fPIC -pthread
 CXXFLAGS += -fmerge-all-constants -ffp-contract=off -m64
 CXXFLAGS += -Wno-builtin-macro-redefined -D__DATE__= -D__TIME__=
 CXXFLAGS += -D__TIMESTAMP__= -no-canonical-prefixes
-CXXFLAGS += -ftrivial-auto-var-init=pattern $(DEBUG) -fdata-sections
+CXXFLAGS += $(DEBUG) -fdata-sections
 CXXFLAGS += -ffunction-sections -fno-math-errno -fno-omit-frame-pointer
 CXXFLAGS += -gdwarf-4 -g2 -ggnu-pubnames -fvisibility=hidden -Wno-shadow
-CXXFLAGS += -Wctad-maybe-unsupported -Wundef -std=c++17 -Wno-trigraphs
+CXXFLAGS += -Wundef -std=c++17 -Wno-trigraphs
 CXXFLAGS += -fno-exceptions -fno-rtti
 CXXFLAGS += -fvisibility-inlines-hidden -Wnon-virtual-dtor -Woverloaded-virtual
 # Silence GCC 12 warnings.
@@ -49,12 +49,12 @@ CXXFLAGS += -I$(S)/third_party/crc32c/src/include
 # Assume all non-test .cc files under net/dcsctp are needed by libdcsctp4j.so.
 # "gn/ninja" includes 37 extra objects but they are not needed by
 # libdcsctp4j.so.
-TESTS = $(wildcard $(S)/net/dcsctp/*/*_test*.cc $(S)/net/dcsctp/*/*/*_test*.cc)
-SOURCES = $(wildcard $(S)/net/dcsctp/*/*.cc $(S)/net/dcsctp/*/*/*.cc)
+TESTS = $(shell find $(S)/net/dcsctp -name "*_test*.cc")
+SOURCES = $(shell find $(S)/net/dcsctp -name "*.cc")
 OBJECTS = $(patsubst %.cc,%.o,$(filter-out $(TESTS),$(SOURCES)))
 # Assume all source files are in subdirectories and subsubdirectories of
 # net/dcsctp.
-DIRS = $(wildcard $(S)/*/ $(S)/*/*/ $(S)/*/*/*/ $(S)/*/*/*/*/ $(S)/*/*/*/*/*/)
+DIRS = $(shell find $(S) -maxdepth 5 -type d -print)
 # Add other objects required to fix libdcsctp4j.so errors; first compilation
 # errors, then undefined symbol errors reported at runtime by the dynamic
 # linker.
@@ -89,4 +89,4 @@ $(OBJDIR)/libdcsctp.a: $(OBJECTS)
 	$(SILENT)$(AR) $(ARFLAGS) $@ $^
 $(OBJECTS): | $(OBJDIRS)
 $(OBJDIRS):
-	@mkdir -p $(OBJDIRS)
+	@mkdir -p $@
